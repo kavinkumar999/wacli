@@ -89,17 +89,29 @@ export async function run(args) {
 
   const sock = await connectWithRetry(authDir());
   try {
-    // For 1:1 chats, confirm the number is actually on WhatsApp (groups skip this).
+    // For 1:1 chats, resolve the canonical jid via onWhatsApp (groups skip this).
+    // We pass the bare number (not the full jid) for reliability, and SEND to the
+    // jid the server returns — which may differ from "<digits>@s.whatsapp.net"
+    // (e.g. a @lid). onWhatsApp can also be inconclusive for valid numbers, so we
+    // only hard-fail when it explicitly says the number does not exist.
+    let target = jid;
     if (!isGroupJid(jid)) {
-      const [hit] = await sock.onWhatsApp(jid);
-      if (!hit?.exists) {
-        throw new Error(`${to} is not on WhatsApp (or the number/country code is wrong).`);
+      const number = jid.split('@')[0];
+      const results = await sock.onWhatsApp(number).catch(() => []);
+      const hit = results?.[0];
+      if (hit?.exists === false) {
+        throw new Error(`${to} is not on WhatsApp (check the number and its country code).`);
+      }
+      if (hit?.jid) {
+        target = hit.jid; // canonical jid from the server
+      } else if (process.env.DEBUG) {
+        console.warn(`onWhatsApp inconclusive for ${number}; sending to ${jid} anyway`);
       }
     }
 
     const content = file ? mediaContent(file, text) : { text };
-    await sock.sendMessage(jid, content);
-    console.log(`sent → ${jid}${file ? `  (${path.basename(file)})` : ''}`);
+    await sock.sendMessage(target, content);
+    console.log(`sent → ${target}${file ? `  (${path.basename(file)})` : ''}`);
   } finally {
     await sleep(1_000); // let the send + creds flush before we tear down
     sock.end(undefined);
