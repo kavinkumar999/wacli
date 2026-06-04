@@ -1,0 +1,15 @@
+#!/bin/sh
+# Preventive guard: refuse to commit the WhatsApp session or secret files.
+# This repo is public — a committed auth_info/ would hand over full account access.
+#
+# Enabled per-clone with:  git config core.hooksPath .githooks
+
+blocked=$(git diff --cached --name-only | grep -Ei 'auth_info/|\.env$|\.env\.[^x]|creds\.json|\.pem$|\.key$|secrets\.json|credentials\.json')
+
+if [ -n "$blocked" ]; then
+  echo "✋ Commit blocked — these files look sensitive and must not be committed:"
+  echo "$blocked" | sed 's/^/   - /'
+  echo
+  echo "If this is a false positive, bypass with:  git commit --no-verify"
+  exit 1
+fi

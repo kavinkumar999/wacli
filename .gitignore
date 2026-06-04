@@ -1,5 +1,22 @@
+# Dependencies
 node_modules/
+
+# WhatsApp linked-device session (NEVER commit — gives full account access)
 auth_info/
+**/auth_info/
+*.creds.json
+
+# Environment / secrets
 .env
-.DS_Store
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.cert
+secrets.json
+**/credentials.json
+
+# Logs and OS cruft
 *.log
+.DS_Store

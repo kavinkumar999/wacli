@@ -71,6 +71,26 @@ or a **group jid** ending in `@g.us` (get one from `wa groups`).
   if you're at the linked-device limit.
 - **Node ≥ 20** required.
 
+## Security
+
+This is a **public** repo, and the linked-device session in `auth_info/` grants
+**full access to the WhatsApp account** — treat it like a password.
+
+- `auth_info/`, `.env*`, and key/cert files are **gitignored**. Never commit them.
+- A pre-commit guard refuses to commit those files even if forced. Enable it once
+  per clone:
+
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+
+- The repository contains **no secrets** — verify anytime with:
+  `git ls-files | grep -Ei 'auth_info|creds|\.env|\.pem|\.key'` (should be empty).
+
+## License
+
+[MIT](LICENSE) © Kavin Kumar.
+
 ## Layout
 
 ```
