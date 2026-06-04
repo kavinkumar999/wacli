@@ -8,7 +8,9 @@
     "wa": "bin/wa.js"
   },
   "scripts": {
-    "wa": "node bin/wa.js"
+    "wa": "node bin/wa.js",
+    "setup": "git config core.hooksPath .githooks && echo \"✓ pre-commit guard enabled (.githooks)\"",
+    "prepare": "git rev-parse --git-dir > /dev/null 2>&1 && git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.9",

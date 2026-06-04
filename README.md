@@ -18,7 +18,9 @@ linked-device session is stored **locally** (no database).
 
 ```bash
 cd wacli
-npm install
+npm install       # also enables the pre-commit secret guard (via the prepare script)
+# if you cloned and the guard isn't active yet:
+npm run setup     # enables it: git config core.hooksPath .githooks
 # optional: put `wa` on your PATH globally
 npm link          # then you can run `wa ...` anywhere; otherwise use `node bin/wa.js ...`
 ```
@@ -53,9 +55,23 @@ or a **group jid** ending in `@g.us` (get one from `wa groups`).
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `WA_AUTH_DIR` | `./auth_info` | Where the session is stored. Set to e.g. `~/.wacli/auth_info` to share one session across directories. A leading `~` is expanded. |
+| `WA_AUTH_DIR` | `~/.wacli/auth_info` | Where the session is stored. A stable per-machine path, so it's the same regardless of which directory you run `wa` from. A leading `~` is expanded. |
 | `LOG_LEVEL` | `silent` | Baileys/pino log level; try `debug` when diagnosing. |
 | `DEBUG` | — | Set to `1` to print stack traces on errors. |
+
+### Where the session lives & using multiple machines
+
+The linked-device session is stored at **`~/.wacli/auth_info`** by default — a
+fixed location in your home directory, **not** inside this repo and **not** tied to
+your current working directory. The repo never contains it. Override the location
+with `WA_AUTH_DIR` if you want.
+
+WhatsApp is multi-device: it links **each device separately** (up to 4). To use
+`wacli` on more than one laptop, run `wa link` **once on each machine** — each gets
+its own session under `~/.wacli/auth_info`. Do **not** copy one `auth_info/` folder
+to another laptop and run both at once; concurrent use of a single session causes
+logouts and conflicts. (Sharing one identity for non-concurrent automation is what
+the sibling `cronwhats` project uses Redis for — out of scope for this CLI.)
 
 ## Notes & limits
 

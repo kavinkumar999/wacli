@@ -4,12 +4,21 @@
 // CI stays stateless), this CLI keeps everything local: Baileys' multi-file auth
 // state writes straight into this folder and reads from it on the next run.
 //
-// Default: ./auth_info in the current working directory. Override with WA_AUTH_DIR
-// (e.g. export WA_AUTH_DIR=~/.wacli/auth_info to share one session across folders).
+// Default: ~/.wacli/auth_info — a STABLE per-machine location, so the session is
+// the same no matter which directory you run `wa` from (and it's well outside the
+// repo). Override with WA_AUTH_DIR to point somewhere else.
+//
+// Multiple laptops: WhatsApp multi-device links each device separately (up to 4),
+// so run `wa link` once on each machine — each gets its own session here. Do NOT
+// share one auth folder between two machines running at the same time; that causes
+// logouts/conflicts.
 
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+
+/** Default per-machine session location when WA_AUTH_DIR is not set. */
+const DEFAULT_AUTH_DIR = path.join(os.homedir(), '.wacli', 'auth_info');
 
 /** Absolute path to the auth folder (honors WA_AUTH_DIR, expands a leading ~). */
 export function authDir() {
@@ -20,7 +29,7 @@ export function authDir() {
       : configured;
     return path.resolve(expanded);
   }
-  return path.resolve(process.cwd(), 'auth_info');
+  return DEFAULT_AUTH_DIR;
 }
 
 /** Ensure the auth folder exists; returns its path. */
