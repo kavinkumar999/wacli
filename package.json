@@ -1,0 +1,21 @@
+{
+  "name": "wacli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Interactive WhatsApp command-line tool (Baileys) with a locally-stored session: send text and files, list chats and groups, watch incoming messages.",
+  "bin": {
+    "wa": "bin/wa.js"
+  },
+  "scripts": {
+    "wa": "node bin/wa.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
