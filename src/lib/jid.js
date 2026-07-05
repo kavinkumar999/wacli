@@ -32,3 +32,27 @@ export function toJid(to) {
 export function isGroupJid(jid) {
   return String(jid).endsWith('@g.us');
 }
+
+/** True if a jid is WhatsApp's LID (privacy) format. */
+export function isLidJid(jid) {
+  return String(jid).endsWith('@lid');
+}
+
+/** 1:1 person jid (phone or LID) — not a group/broadcast/meta chat. */
+export function isPersonJid(jid) {
+  const j = String(jid ?? '');
+  if (!j || isGroupJid(j)) return false;
+  if (j.endsWith('@broadcast') || j === 'status@broadcast') return false;
+  if (j.endsWith('@newsletter') || j.endsWith('@bot')) return false;
+  return j.endsWith('@s.whatsapp.net') || isLidJid(j);
+}
+
+/**
+ * Heuristic: does this input look like a phone number (as opposed to a contact
+ * name) worth treating as a raw number? Digits + optional separators, ≥3 digits.
+ * @param {string} s
+ */
+export function looksNumeric(s) {
+  const str = String(s ?? '');
+  return /^[0-9]{3,}$/.test(str.replace(/[^0-9]/g, '')) && /[0-9]/.test(str) && !/[a-z]/i.test(str);
+}

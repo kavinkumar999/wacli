@@ -11,9 +11,9 @@ const COMMANDS = {
   link: 'link',
   status: 'status',
   send: 'send',
-  chats: 'chats',
+  ui: 'ui',
+  contacts: 'contacts',
   groups: 'groups',
-  watch: 'watch',
   logout: 'logout',
 };
 
@@ -25,13 +25,16 @@ const USAGE = `
   Commands:
     link [--fresh]                 Pair this device via a terminal QR code
     status                         Show whether a session is linked and connects
-    send <to> <message> [--file p] Send text (and/or a file) to a number or group
-    chats [--limit N]              List recent chats (best-effort)
+    send <to> <message> [--file p] Send text (and/or a file) to a name, number,
+                                   or group (resolves a saved contact name)
+    ui [number]                    Interactive send-only UI: search a contact or
+                                   group, type a message, attach a file
+    contacts [sync [--full]|list|<name>]  Contact cache for send-by-name (see sync --full)
     groups                         List groups you're a member of
-    watch [--from <to>]            Stream incoming messages until Ctrl-C
     logout                         Remove the local session
 
-  <to> is an international number (e.g. 919876543210) or a group jid (…@g.us).
+  <to> is a saved contact name, an international number (e.g. 919876543210), or a
+  group jid (…@g.us). Run \`wa contacts sync\` once so names can be resolved.
   Override the session folder with WA_AUTH_DIR. Set DEBUG=1 for stack traces.
 `;
 

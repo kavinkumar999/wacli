@@ -35,7 +35,11 @@ export function authDir() {
 /** Ensure the auth folder exists; returns its path. */
 export async function ensureAuthDir() {
   const dir = authDir();
-  await fs.mkdir(dir, { recursive: true });
+  const parent = path.dirname(dir);
+  await fs.mkdir(parent, { recursive: true, mode: 0o700 });
+  await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+  await fs.chmod(parent, 0o700).catch(() => {});
+  await fs.chmod(dir, 0o700).catch(() => {});
   return dir;
 }
 

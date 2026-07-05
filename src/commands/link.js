@@ -11,8 +11,11 @@
 import QRCode from 'qrcode';
 import { authDir, clearSession, ensureAuthDir } from '../lib/auth.js';
 import { printCliFailure } from '../lib/cli-print.js';
-import { sleep } from '../lib/util.js';
+import { attachContactCapture, loadContacts, pullContacts, saveContacts } from '../lib/contacts-store.js';
 import { connectWithRetry } from '../lib/whatsapp.js';
+
+// After pairing, pull contacts from WhatsApp so `wa send <name>` works right away.
+const CONTACT_SYNC_MS = 15_000;
 
 const LOGGED_OUT_MESSAGE = [
   'WhatsApp ended linking as "logged out" (session rejected). Try, in order:',
@@ -38,7 +41,14 @@ export async function run(args) {
   }
   const dir = await ensureAuthDir();
 
+  const contacts = await loadContacts();
+
   const sock = await connectWithRetry(dir, {
+    // Do NOT set syncFullHistory here — WhatsApp rejects registration with code 428
+    // when requireFullSync is set on the pairing payload. Pull contacts after open
+    // instead (pullContacts + shouldSyncHistoryMessage below).
+    shouldSyncHistoryMessage: () => true,
+    onSock: (s) => attachContactCapture(s, contacts),
     onSocket: async (sock) => {
       if (sock.authState.creds.registered) return;
       console.log('Waiting for QR… (if nothing appears, widen your terminal)\n');
@@ -58,9 +68,17 @@ export async function run(args) {
 
   const me = sock.user?.id || 'unknown';
   console.log(`\nConnected as ${me}. Session saved to ${authDir()}.`);
-  await sleep(2_000); // let the final creds.update flush to disk
+
+  // Pull address book + group members + recent chat names into the cache so
+  // `wa send <name>` works right away.
+  console.log(`Syncing your contacts (${CONTACT_SYNC_MS / 1000}s)…`);
+  await pullContacts(sock, contacts, { waitMs: CONTACT_SYNC_MS, attach: false, replayNames: true });
+  await saveContacts(contacts);
+  const n = Object.keys(contacts).length;
+  console.log(`Cached ${n} contact${n === 1 ? '' : 's'} for send-by-name.`);
+
   sock.end(undefined);
-  console.log('Done — you can now use `wa send`, `wa chats`, `wa groups`, `wa watch`.');
+  console.log('Done — you can now use `wa send`, `wa ui`, `wa groups`, and `wa contacts`.');
   // Baileys can leave timers/sockets open; force a clean exit so the shell returns.
   process.exit(0);
 }

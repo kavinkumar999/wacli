@@ -4,6 +4,9 @@ node_modules/
 # WhatsApp linked-device session (NEVER commit — gives full account access)
 auth_info/
 **/auth_info/
+.wacli/
+**/.wacli/
+contacts.json
 *.creds.json
 
 # Environment / secrets

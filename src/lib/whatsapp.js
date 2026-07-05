@@ -14,9 +14,41 @@ import makeWASocket, {
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
+import { beginNoiseSuppression, guardSocket } from './noise.js';
+import { attachContactCapture, loadContacts, saveContacts } from './contacts-store.js';
 import { sleep } from './util.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'silent' });
+
+/**
+ * Keep the local contact cache fresh on every connection, in the background.
+ * Strictly fire-and-forget: any failure here must never disrupt the actual
+ * command (sending, etc.). Saves are debounced so a burst of sync
+ * events becomes a single write.
+ */
+function attachPassiveContactCapture(sock) {
+  loadContacts()
+    .then((map) => {
+      let timer = null;
+      let dirty = false;
+      const flush = () => {
+        timer = null;
+        if (!dirty) return;
+        dirty = false;
+        saveContacts(map).catch(() => {});
+      };
+      attachContactCapture(sock, map, {
+        onChange: () => {
+          dirty = true;
+          if (!timer) {
+            timer = setTimeout(flush, 1_000);
+            if (timer.unref) timer.unref(); // don't keep the process alive
+          }
+        },
+      });
+    })
+    .catch(() => {});
+}
 
 /**
  * Open a Baileys socket once.
@@ -31,7 +63,7 @@ const logger = pino({ level: process.env.LOG_LEVEL || 'silent' });
  * @returns {Promise<{ sock: any, status: 'open' | 'close', code?: number }>}
  */
 export async function openOnce(authDir, onSocket, options) {
-  const { onConnectionUpdate, onSock } = options ?? {};
+  const { onConnectionUpdate, onSock, syncFullHistory = false, shouldSyncHistoryMessage } = options ?? {};
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
   const { version } = await fetchLatestBaileysVersion();
 
@@ -46,10 +78,22 @@ export async function openOnce(authDir, onSocket, options) {
     // Match a normal WhatsApp Web client (Baileys default). A custom label is
     // easy for the server to flag and reject during QR link.
     browser: Browsers.appropriate('Chrome'),
+    // Request the full history sync (which carries your address book / contacts).
+    // Enabling it on reconnect makes WhatsApp reject the connection (code 428); it
+    // also breaks fresh QR pairing (registration). Use pullContacts after open
+    // instead. Defaults off.
+    syncFullHistory,
+    ...(shouldSyncHistoryMessage !== undefined ? { shouldSyncHistoryMessage } : {}),
   });
+
+  beginNoiseSuppression();
+  guardSocket(sock);
 
   // Persist credential changes to the folder as they happen.
   sock.ev.on('creds.update', saveCreds);
+
+  // Passively cache any contact names WhatsApp syncs, for `wa send <name>`.
+  attachPassiveContactCapture(sock);
 
   if (onSock) onSock(sock);
   if (onSocket) await onSocket(sock);
@@ -80,6 +124,9 @@ export async function openOnce(authDir, onSocket, options) {
  * @param {number} [options.maxAttempts=5]
  * @param {number} [options.retryDelayMs=2000]
  * @param {string} [options.loggedOutMessage]
+ * @param {boolean} [options.quiet=false]  suppress retry warnings (for TUIs)
+ * @param {() => boolean} [options.shouldSyncHistoryMessage]  process chat history
+ *        notifications if WhatsApp sends them (used by `wa contacts sync --full`)
  * @returns {Promise<any>} the open socket (caller owns it and must `sock.end()`).
  */
 export async function connectWithRetry(authDir, options = {}) {
@@ -87,15 +134,20 @@ export async function connectWithRetry(authDir, options = {}) {
     onSocket,
     onConnectionUpdate,
     onSock,
+    syncFullHistory = false,
+    shouldSyncHistoryMessage,
     maxAttempts = 5,
     retryDelayMs = 2_000,
     loggedOutMessage = 'Session logged out by WhatsApp. Run `wa link` to re-pair this device.',
+    quiet = false,
   } = options;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const { sock, status, code } = await openOnce(authDir, onSocket, {
       onConnectionUpdate,
       onSock,
+      syncFullHistory,
+      shouldSyncHistoryMessage,
     });
     if (status === 'open') return sock;
 
@@ -104,7 +156,7 @@ export async function connectWithRetry(authDir, options = {}) {
       throw new Error(loggedOutMessage);
     }
     // restartRequired (515) right after pairing is normal — recreate and continue.
-    console.warn(`connect attempt ${attempt} closed (code ${code}); retrying...`);
+    if (!quiet) console.warn(`connect attempt ${attempt} closed (code ${code}); retrying...`);
     await sleep(retryDelayMs);
   }
 
